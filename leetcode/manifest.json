@@ -1,0 +1,18 @@
+{
+    "name": "leetcode solutions extension",
+    "description": "A google chrome extension that detects when a user has correctly solved a leetcode problem, and then records the problem metadata, such as the problem name, difficulty, and tags into a specified google sheets file, as well as prompts the user for a detailed walkthrough of the solution. The extension will also provide a dashboard for users to view their progress and statistics, such as the number of problems solved, problems solved per day/week/month, the distribution of difficulty levels, and the most common tags. The extension will use the LeetCode API to fetch problem metadata and the Google Sheets API to store and retrieve data.",
+    "version": "1.0",
+    "manifest_version": 3,
+    "action": {
+        "default_pop"
+    }
+    "permissions": [
+        "activeTab",
+        "storage",
+        "https://leetcode.com/*",
+        "https://sheets.googleapis.com/*"
+    ],
+    "background": {
+        "service_worker": "background.js"
+    },
+}
