@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LeetCode Tracker</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <main class="shell" data-mode="popup">
+        <section class="hero card">
+            <p class="eyebrow">LeetCode solve capture</p>
+            <h1>Turn accepted runs into reusable notes.</h1>
+            <p class="hero-copy">Capture what clicked while the solution is still fresh, then push it into your Google Sheet without leaving the extension.</p>
+            <div class="hero-meta">
+                <span class="hero-chip" id="solve-status">Waiting for a solve</span>
+                <span class="hero-chip hero-chip-muted" id="queue-status">0 queued</span>
+            </div>
+        </section>
+
+        <section class="card solve-card" id="solve-card">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Pending solve</p>
+                    <h2 id="problem-title">No accepted solve yet</h2>
+                </div>
+                <span class="difficulty-pill" id="difficulty-pill">Idle</span>
+            </div>
+            <div class="metadata-grid">
+                <div>
+                    <span class="label">Problem</span>
+                    <p id="problem-slug">Open a LeetCode problem and get Accepted to trigger capture.</p>
+                </div>
+                <div>
+                    <span class="label">Language</span>
+                    <p id="language-value">-</p>
+                </div>
+                <div>
+                    <span class="label">Runtime</span>
+                    <p id="runtime-value">-</p>
+                </div>
+                <div>
+                    <span class="label">Memory</span>
+                    <p id="memory-value">-</p>
+                </div>
+            </div>
+            <div class="tag-row" id="tag-row"></div>
+            <a class="ghost-link" id="problem-link" href="#" target="_blank" rel="noreferrer">Open submission</a>
+        </section>
+
+        <section class="card form-card">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Reflection</p>
+                    <h2>What should future-you remember?</h2>
+                </div>
+            </div>
+
+            <form id="reflection-form">
+                <p class="eyebrow">Captured metadata — edit if incorrect</p>
+
+                <label class="field">
+                    <span>Problem description</span>
+                    <textarea id="problemDescription" name="problemDescription" rows="3" placeholder="Auto-detected from problem page, or paste manually."></textarea>
+                </label>
+
+                <div class="two-column">
+                    <label class="field">
+                        <span>Language</span>
+                        <input id="languageEdit" name="languageEdit" type="text" placeholder="e.g. Python">
+                    </label>
+                    <label class="field">
+                        <span>Runtime</span>
+                        <input id="runtimeEdit" name="runtimeEdit" type="text" placeholder="e.g. 52 ms">
+                    </label>
+                </div>
+
+                <label class="field">
+                    <span>Walkthrough</span>
+                    <textarea id="walkthrough" name="walkthrough" rows="6" placeholder="Explain the approach, the turning point, and why it works."></textarea>
+                </label>
+
+                <div class="two-column">
+                    <label class="field">
+                        <span>Key insights</span>
+                        <textarea id="keyInsights" name="keyInsights" rows="4" placeholder="One insight per line works well here."></textarea>
+                    </label>
+                    <label class="field">
+                        <span>Mistakes / blockers</span>
+                        <textarea id="mistakes" name="mistakes" rows="4" placeholder="Capture the false starts or edge cases that mattered."></textarea>
+                    </label>
+                </div>
+
+                <div class="two-column compact-row">
+                    <label class="field">
+                        <span>Confidence</span>
+                        <select id="confidence" name="confidence">
+                            <option value="fragile">Fragile</option>
+                            <option value="solid" selected>Solid</option>
+                            <option value="teachable">Teachable</option>
+                        </select>
+                    </label>
+
+                    <label class="toggle-field">
+                        <input id="revisit" name="revisit" type="checkbox">
+                        <span>Mark for revisit</span>
+                    </label>
+                </div>
+
+                <div class="action-row">
+                    <button class="primary-button" id="submit-button" type="submit">Save to Google Sheets</button>
+                    <button class="secondary-button" id="open-prompt-button" type="button">Open prompt window</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="card settings-card">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Apps Script</p>
+                    <h2>Endpoint and target sheet</h2>
+                </div>
+            </div>
+
+            <form id="settings-form">
+                <label class="field">
+                    <span>Apps Script Web App URL</span>
+                    <input id="webAppUrl" name="webAppUrl" type="url" placeholder="https://script.google.com/macros/s/.../exec">
+                </label>
+
+                <label class="field">
+                    <span>Shared secret</span>
+                    <input id="sharedSecret" name="sharedSecret" type="password" placeholder="Paste the shared secret used by Apps Script">
+                </label>
+
+                <label class="field">
+                    <span>Sheet name override</span>
+                    <input id="sheetName" name="sheetName" type="text" placeholder="Leave blank to use the Apps Script default">
+                </label>
+
+                <div class="action-row settings-actions">
+                    <button class="secondary-button" id="save-settings-button" type="submit">Save settings</button>
+                    <button class="secondary-button" id="sync-button" type="button">Sync queued entries</button>
+                </div>
+                <p class="setup-copy" id="setup-copy">Add the Apps Script web app URL and shared secret before submitting or syncing solves.</p>
+            </form>
+        </section>
+
+        <section class="status-banner hidden" id="status-banner" role="status" aria-live="polite"></section>
+    </main>
+
+    <script src="popup.js"></script>
+</body>
+</html>
