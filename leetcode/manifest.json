@@ -11,7 +11,9 @@
         "service_worker": "background.js"
     },
     "permissions": [
-        "storage"
+        "storage",
+        "scripting",
+        "tabs"
     ],
     "host_permissions": [
         "https://leetcode.com/*",
@@ -19,6 +21,16 @@
         "https://script.googleusercontent.com/*"
     ],
     "content_scripts": [
+        {
+            "matches": [
+                "https://leetcode.com/problems/*"
+            ],
+            "js": [
+                "inject.js"
+            ],
+            "run_at": "document_start",
+            "world": "MAIN"
+        },
         {
             "matches": [
                 "https://leetcode.com/problems/*"

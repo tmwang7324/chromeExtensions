@@ -43,6 +43,15 @@ chrome.runtime.onInstalled.addListener(async () => {
     if (!stored[STORAGE_KEYS.loggedFingerprints]) {
         await storageSet({ [STORAGE_KEYS.loggedFingerprints]: {} });
     }
+
+    // Inject content script into already-open LeetCode tabs that missed the initial injection.
+    const tabs = await chrome.tabs.query({ url: "https://leetcode.com/problems/*" });
+    for (const tab of tabs) {
+        chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ["content.js"]
+        }).catch(() => { /* tab may have closed or be restricted */ });
+    }
 });
 
 chrome.windows.onRemoved.addListener(async (windowId) => {
@@ -51,6 +60,12 @@ chrome.windows.onRemoved.addListener(async (windowId) => {
     if (promptWindowId === windowId) {
         await storageRemove([STORAGE_KEYS.promptWindowId]);
     }
+});
+
+chrome.runtime.onStartup.addListener(async () => {
+    // Browser restart invalidates all previous window IDs. Clear the stored
+    // prompt window ID so openPromptWindow() always creates a fresh window.
+    await storageRemove([STORAGE_KEYS.promptWindowId]);
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -331,14 +346,22 @@ async function markSolveCompleted(fingerprint) {
 
 async function openPromptWindow() {
     const { promptWindowId } = await storageGet([STORAGE_KEYS.promptWindowId]);
+    const popupUrl = chrome.runtime.getURL("popup.html");
 
     if (promptWindowId) {
         try {
-            await windowsUpdate(promptWindowId, { focused: true, drawAttention: true });
-            return { opened: false, focused: true };
-        } catch (error) {
-            await storageRemove([STORAGE_KEYS.promptWindowId]);
+            const win = await windowsGet(promptWindowId, { populate: true });
+            const isOurPopup = Array.isArray(win?.tabs) &&
+                win.tabs.some((tab) => (tab.url || "").startsWith(popupUrl));
+
+            if (isOurPopup) {
+                await windowsUpdate(promptWindowId, { focused: true, drawAttention: true });
+                return { opened: false, focused: true };
+            }
+        } catch (_) {
+            // Window no longer exists or belongs to a different extension session.
         }
+        await storageRemove([STORAGE_KEYS.promptWindowId]);
     }
 
     const windowInfo = await windowsCreate({
@@ -401,6 +424,21 @@ function storageSet(items) {
 
 function storageRemove(keys) {
     return chrome.storage.local.remove(keys);
+}
+
+function windowsGet(windowId, options) {
+    return new Promise((resolve, reject) => {
+        chrome.windows.get(windowId, options, (win) => {
+            const runtimeError = chrome.runtime.lastError;
+
+            if (runtimeError) {
+                reject(new Error(runtimeError.message));
+                return;
+            }
+
+            resolve(win);
+        });
+    });
 }
 
 function windowsCreate(options) {

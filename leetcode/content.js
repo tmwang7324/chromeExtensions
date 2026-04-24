@@ -1,12 +1,16 @@
 (function initializeTracker() {
+    if (window.__leetcodeTrackerInitialized) return;
+    window.__leetcodeTrackerInitialized = true;
+
     const SELECTORS = {
         submissionResult: '[data-e2e-locator="submission-result"]',
-        titleLink: 'a[href^="/problems/"]',
+        titleLink: ['a[href^="/problems/"]','[data-cy="question-title"]'],
         tagLinks: 'a[href^="/tag/"]',
         problemDescriptionDivs: [
             '#f8940b02-76b7-27f9-4176-51a709ee6648',
             '[data-track-load="description_content"]',
             '[data-cy="question-content"]',
+            
             '.question-content'
         ],
         difficultyBadges: [
@@ -22,9 +26,11 @@
     let routeKey = location.pathname;
     let lastSentFingerprint = "";
     let scheduled = false;
+    let lastApiResult = null;
 
     bootstrapHistoryHooks();
     attachObserver();
+    listenForApiResults();
     scheduleScan();
 
     window.addEventListener("leetcode-route-change", () => {
@@ -32,9 +38,32 @@
         if (routeKey !== location.pathname) {
             routeKey = location.pathname;
             lastSentFingerprint = "";
+            lastApiResult = null;
             scheduleScan();
         }
     });
+
+    function listenForApiResults() {
+        window.addEventListener("message", (event) => {
+            if (
+                event.source !== window ||
+                !event.data?.__leetcodeTracker ||
+                event.data.type !== "SUBMISSION_API_RESULT"
+            ) {
+                return;
+            }
+            const p = event.data.payload;
+            console.log("[LeetCode Tracker] API result received:", p);
+            lastApiResult = p;
+            if (p.status === "Accepted") {
+                // Reset so a prior DOM-only scan's fingerprint doesn't block this send.
+                lastSentFingerprint = "";
+                // Call directly instead of scheduleScan() to avoid being dropped by
+                // the debounce if a MutationObserver scan is already queued.
+                inspectPage();
+            }
+        });
+    }
 
     function attachObserver() {
         console.log("[LeetCode Tracker] Attaching DOM observer.");
@@ -103,8 +132,9 @@
         }
 
         const resultNode = document.querySelector(SELECTORS.submissionResult);
-        const resultText = normalizeWhitespace(resultNode?.textContent || "");
-        console.log("[LeetCode Tracker] Result node found:", !!resultNode, "Result text:", resultText);
+        const domResultText = normalizeWhitespace(resultNode?.textContent || "");
+        const resultText = domResultText || (lastApiResult?.status ?? "");
+        console.log("[LeetCode Tracker] Result node found:", !!resultNode, "DOM text:", domResultText, "API status:", lastApiResult?.status ?? "none");
         
         if (!resultNode) {
             console.warn("[LeetCode Tracker] Selector not found:", SELECTORS.submissionResult);
@@ -139,10 +169,10 @@
         const titleInfo = parseProblemTitle(routeInfo.problemSlug);
         const difficulty = descriptionInfo.difficulty || extractDifficulty();
         const tags = extractTags();
-        const language = extractStatValue([/Language\s+([A-Za-z0-9+#.\- ]+)/i]);
-        const runtime = extractStatValue([/Runtime\s+([0-9.]+\s*[A-Za-z]+)/i]);
-        const memory = extractStatValue([/Memory\s+([0-9.]+\s*[A-Za-z]+)/i]);
-        const submissionId = routeInfo.submissionId || extractSubmissionIdFromLinks();
+        const language = lastApiResult?.language || extractStatValue([/Language\s+([A-Za-z0-9+#.\-]+)/i]);
+        const runtime = lastApiResult?.runtime   || extractStatValue([/Runtime\s+([0-9.]+\s*[A-Za-z]+)/i]);
+        const memory = lastApiResult?.memory     || extractStatValue([/Memory\s+([0-9.]+\s*[A-Za-z]+)/i]);
+        const submissionId = lastApiResult?.submissionId || routeInfo.submissionId || extractSubmissionIdFromLinks();
         const problemNumber = descriptionInfo.problemNumber || titleInfo.problemNumber || routeInfo.problemNumber || "";
         const problemTitle = descriptionInfo.problemTitle || titleInfo.problemTitle || toTitleCase(routeInfo.problemSlug.replace(/-/g, " "));
         const problemDescription = descriptionInfo.description || "";
@@ -244,13 +274,13 @@
         const titleText = normalizeWhitespace(matchingLink?.textContent || "");
         const match = titleText.match(/^(\d+)\.\s+(.+)$/);
 
-        if (!titleText) {
+        if (!match) {
             return { problemNumber: "", problemTitle: "" };
         }
-
+        console.log("[LeetCode Tracker] Title link found:", titleText, "Parsed number:", match[1], "Parsed title:", match[2]);
         return {
-            problemNumber: match?.[1] || "",
-            problemTitle: match?.[2] || titleText
+            problemNumber: match[1],
+            problemTitle: match[2]
         };
     }
 

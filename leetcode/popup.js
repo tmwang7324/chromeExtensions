@@ -39,6 +39,7 @@ let draftSaveHandle = null;
 document.addEventListener("DOMContentLoaded", async () => {
     applyMode();
     bindEvents();
+    console.log("[LeetCode Tracker] Popup loaded, fetching initial state...");
     await refreshState();
 });
 
