@@ -7,6 +7,8 @@ const formElements = {
     problemDescription: document.getElementById("problemDescription"),
     languageEdit: document.getElementById("languageEdit"),
     runtimeEdit: document.getElementById("runtimeEdit"),
+    memoryEdit: document.getElementById("memoryEdit"),
+    difficultyEdit: document.getElementById("difficultyEdit"),
     webAppUrl: document.getElementById("webAppUrl"),
     sharedSecret: document.getElementById("sharedSecret"),
     sheetName: document.getElementById("sheetName")
@@ -43,6 +45,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     await refreshState();
 });
 
+chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== "local") return;
+    if ("pendingSolve" in changes || "queue" in changes) {
+        refreshState();
+    }
+});
+
 function applyMode() {
     const params = new URLSearchParams(window.location.search);
     const mode = params.get("mode") || "popup";
@@ -63,32 +72,37 @@ function bindEvents() {
         formElements.revisit,
         formElements.problemDescription,
         formElements.languageEdit,
-        formElements.runtimeEdit
+        formElements.runtimeEdit,
+        formElements.memoryEdit,
+        formElements.difficultyEdit
     ]) {
         element.addEventListener("input", scheduleDraftSave);
         element.addEventListener("change", scheduleDraftSave);
     }
 }
 
+// Fetch the latest app state from the background script and re-render the UI accordingly
 async function refreshState() {
     const response = await sendMessage({ type: "GET_APP_STATE" });
     appState = response.state;
+    console.log("[LeetCode Tracker] Received app state:", appState, "with pendingSolve:", appState?.pendingSolve);
     renderState();
 }
 
 function renderState() {
-    renderPendingSolve(appState.pendingSolve);
+    console.log("[LeetCode Tracker] Rendering state:", appState);
+    renderPendingSolve(appState.pendingSolve, appState);
     renderDraft(appState.draft);
     renderSettings(appState.settings, appState.endpointConfigured, appState.queueCount);
 }
 
-function renderPendingSolve(solve) {
+function renderPendingSolve(solve, appState) {
     if (!solve) {
         ui.solveStatus.textContent = "Waiting for a solve";
         ui.problemTitle.textContent = "No accepted solve yet";
         ui.problemSlug.textContent = "Open a LeetCode problem and get Accepted to trigger capture.";
-        ui.difficultyPill.textContent = "Idle";
-        ui.difficultyPill.dataset.difficulty = "";
+        ui.difficultyPill.textContent = appState.difficulty || "Unknown ";
+        ui.difficultyPill.dataset.difficulty = appState.difficulty || "";
         ui.languageValue.textContent = "-";
         ui.runtimeValue.textContent = "-";
         ui.memoryValue.textContent = "-";
@@ -99,23 +113,27 @@ function renderPendingSolve(solve) {
         formElements.problemDescription.value = "";
         formElements.languageEdit.value = "";
         formElements.runtimeEdit.value = "";
+        formElements.memoryEdit.value = "";
+        formElements.difficultyEdit.value = "";
         return;
     }
-
+    console.log("[LeetCode Tracker] Rendering pending solve:", solve);
     ui.solveStatus.textContent = "Accepted solve captured";
     ui.problemTitle.textContent = [solve.problemNumber, solve.problemTitle].filter(Boolean).join(". ") || solve.problemTitle;
     ui.problemSlug.textContent = solve.problemSlug || "-";
-    ui.difficultyPill.textContent = solve.difficulty || "Unknown";
+    ui.difficultyPill.textContent = solve.difficulty || appState.difficulty || "Unknown ";
     ui.difficultyPill.dataset.difficulty = solve.difficulty || "";
     ui.languageValue.textContent = solve.language || "Unknown";
     ui.runtimeValue.textContent = solve.runtime || "Unknown";
-    ui.memoryValue.textContent = solve.memory || "Unknown";
+    ui.memoryValue.textContent = solve.memory || appState.memoryValue || "Unknown";
     ui.problemLink.href = solve.leetcodeUrl || "#";
     ui.problemLink.textContent = solve.leetcodeUrl ? "Open submission" : "LeetCode URL unavailable";
     ui.submitButton.disabled = false;
     formElements.problemDescription.value = solve.problemDescription || "";
     formElements.languageEdit.value = solve.language || "";
     formElements.runtimeEdit.value = solve.runtime || "";
+    formElements.memoryEdit.value = solve.memory || "";
+    formElements.difficultyEdit.value = solve.difficulty || "";
 
     const tags = Array.isArray(solve.tags) ? solve.tags : [];
     const chips = tags.length ? tags.map(createTagChip) : [createTagChip("No tags captured yet")];
@@ -132,6 +150,8 @@ function renderDraft(draft) {
     if (draft.problemDescription) formElements.problemDescription.value = draft.problemDescription;
     if (draft.language) formElements.languageEdit.value = draft.language;
     if (draft.runtime) formElements.runtimeEdit.value = draft.runtime;
+    if (draft.memory) formElements.memoryEdit.value = draft.memory;
+    if (draft.difficulty) formElements.difficultyEdit.value = draft.difficulty;
 }
 
 function renderSettings(settings, endpointConfigured, queueCount) {
@@ -242,7 +262,9 @@ function collectDraftPayload() {
         revisit: formElements.revisit.checked,
         problemDescription: formElements.problemDescription.value,
         language: formElements.languageEdit.value,
-        runtime: formElements.runtimeEdit.value
+        runtime: formElements.runtimeEdit.value,
+        memory: formElements.memoryEdit.value,
+        difficulty: formElements.difficultyEdit.value
     };
 }
 

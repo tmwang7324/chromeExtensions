@@ -1,3 +1,7 @@
+// background.js - Main background script for the LeetCode Tracker Chrome extension.
+// STORAGE_KEYS defines the keys used in Chrome's local storage to manage settings, pending solves, 
+// drafts, queues, logged fingerprints, and the prompt window ID.
+
 const STORAGE_KEYS = {
     settings: "settings",
     pendingSolve: "pendingSolve",
@@ -7,12 +11,14 @@ const STORAGE_KEYS = {
     promptWindowId: "promptWindowId"
 };
 
+// DEFAULT_SETTINGS provides default values for the extension's settings, including the web app URL, shared secret, and sheet name for the Google Sheets integration.
 const DEFAULT_SETTINGS = {
     webAppUrl: "",
     sharedSecret: "",
     sheetName: ""
 };
 
+// SHEET_COLUMNS defines the columns used in the Google Sheets integration for logging solves and reflections.
 const SHEET_COLUMNS = [
     "Problem Number",
     "Problem Title",
@@ -75,7 +81,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     return true;
 });
-
+// handleMessage is the main entry point for all messages from content scripts and popups. 
+// It routes based on message.type and performs actions like saving settings, handling detected solves, 
+// submitting reflections, syncing queues, and opening the prompt window. Each case is designed to interact with Chrome's storage and windows APIs to manage state and user interactions effectively.
 async function handleMessage(message) {
     switch (message?.type) {
         case "SOLVE_DETECTED":
@@ -96,7 +104,9 @@ async function handleMessage(message) {
             throw new Error("Unsupported message type.");
     }
 }
-
+// Once a submit request is detected, handleSolveDetected is executed. It first checks if the data from the solve has a fingerprint, which is a unique identifier for the solve.
+// It then retrieves the current pending solve and logged fingerprints from storage. If the fingerprint of the new solve matches a logged fingerprint, it identifies it as a duplicate and returns accordingly. If it matches the pending solve, it may update the stored solve with any new information and focuses the prompt window. 
+// If it's a new solve, it stores it as the pending solve and opens the prompt window for user interaction.
 async function handleSolveDetected(payload) {
     if (!payload?.fingerprint) {
         throw new Error("Missing solve fingerprint.");
@@ -115,6 +125,29 @@ async function handleSolveDetected(payload) {
     }
 
     if (pendingSolve?.fingerprint === payload.fingerprint) {
+        // Same fingerprint, but the new payload may carry richer API data that
+        // arrived after the initial DOM-only scan. Merge any fields that were
+        // blank in the stored solve so the popup gets complete metadata.
+        const improved = {
+            language:   payload.language   || pendingSolve.language,
+            runtime:    payload.runtime    || pendingSolve.runtime,
+            memory:     payload.memory     || pendingSolve.memory,
+            difficulty: pendingSolve.difficulty 
+        };
+        if (payload.difficulty !== "" && payload.difficulty !== pendingSolve.difficulty) {
+            improved.difficulty = payload.difficulty;
+        }
+        const needsUpdate = Object.keys(improved).some(
+            (k) => improved[k] !== pendingSolve[k]
+        );
+        // difficulty is a special case where the initial value may be the only correct final value (e.g. for premium problems), so we only update it if the stored value is blank.
+        //if pendingSolve.difficulty && improved.difficulty
+
+        if (needsUpdate) {
+            await storageSet({
+                [STORAGE_KEYS.pendingSolve]: { ...pendingSolve, ...improved }
+            });
+        }
         await openPromptWindow();
         return { duplicate: "pending" };
     }
@@ -130,6 +163,8 @@ async function handleSolveDetected(payload) {
     return { accepted: true };
 }
 
+// getAppState retrieves the current state of the application, including user settings, any pending solve, draft reflections, the count of queued entries, and whether the endpoint for logging solves is configured. 
+// This function is used by the popup to display the current status and pre-fill information as needed.
 async function getAppState() {
     const stored = await storageGet([
         STORAGE_KEYS.settings,
@@ -148,6 +183,9 @@ async function getAppState() {
     };
 }
 
+// saveSettings takes the settings payload from the popup, normalizes it, and saves it to STORAGE_KEYS.settings in Chrome's local storage. It returns the saved settings for confirmation. 
+// This function allows users to configure their Google Sheets integration and other preferences through the popup interface.
+// The save settings payload is triggered upon the Save Settings button.
 async function saveSettings(payload) {
     const settings = normalizeSettings(payload);
 
@@ -164,7 +202,9 @@ async function saveDraft(payload) {
         revisit: Boolean(payload?.revisit),
         problemDescription: String(payload?.problemDescription || ""),
         language: String(payload?.language || ""),
-        runtime: String(payload?.runtime || "")
+        runtime: String(payload?.runtime || ""),
+        memory: String(payload?.memory || ""),
+        difficulty: String(payload?.difficulty || "")
     };
 
     await storageSet({ [STORAGE_KEYS.draft]: draft });
@@ -301,11 +341,11 @@ function buildSubmissionRecord(pendingSolve, payload) {
         problemNumber: pendingSolve.problemNumber || "",
         problemTitle: pendingSolve.problemTitle || "",
         problemDescription: String(payload?.problemDescription || "").trim() || pendingSolve.problemDescription || "",
-        difficulty: pendingSolve.difficulty || "",
+        difficulty: String(payload?.difficulty || "").trim() || pendingSolve.difficulty || "",
         tags: Array.isArray(pendingSolve.tags) ? pendingSolve.tags : [],
         language: String(payload?.language || "").trim() || pendingSolve.language || "",
         runtime: String(payload?.runtime || "").trim() || pendingSolve.runtime || "",
-        memory: pendingSolve.memory || "",
+        memory: String(payload?.memory || "").trim() || pendingSolve.memory || "",
         leetcodeUrl: pendingSolve.leetcodeUrl || "",
         walkthrough: String(payload?.walkthrough || "").trim(),
         keyInsights: String(payload?.keyInsights || "").trim(),
@@ -410,7 +450,9 @@ function createEmptyDraft() {
         revisit: false,
         problemDescription: "",
         language: "",
-        runtime: ""
+        runtime: "",
+        memory: "",
+        difficulty: ""
     };
 }
 

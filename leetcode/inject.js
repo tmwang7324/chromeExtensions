@@ -11,8 +11,10 @@
             const clone = response.clone();
             clone.json().then((data) => {
                 if (!data || typeof data !== "object") return;
+                // Skip intermediate polling responses — judge hasn't finished yet
+                if (!data.status_msg) return;
                 const idMatch = url.match(/\/submissions\/detail\/(\d+)/);
-
+                console.log(`Data fetched from ${url}: ${JSON.stringify(data)}`);
                 window.postMessage({
                     __leetcodeTracker: true,
                     type: "SUBMISSION_API_RESULT",
@@ -23,6 +25,7 @@
                         language:     data.lang            || "",
                         submissionId: idMatch?.[1]         || ""
                     }
+                    
                 }, window.location.origin);
             }).catch(() => {});
         }

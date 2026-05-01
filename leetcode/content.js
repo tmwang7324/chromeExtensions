@@ -32,7 +32,8 @@
     attachObserver();
     listenForApiResults();
     scheduleScan();
-
+    // recheck the page after the page's route changes, since LeetCode is a single-page app and may not do a full reload on navigation.
+    // clear all of the cached variables such as lastSentFingerprint and lastAPIResult to ensure we don't miss a solve that happens right after navigation.
     window.addEventListener("leetcode-route-change", () => {
         console.log("[LeetCode Tracker] Route change detected. Old:", routeKey, "New:", location.pathname);
         if (routeKey !== location.pathname) {
@@ -42,7 +43,7 @@
             scheduleScan();
         }
     });
-
+    //
     function listenForApiResults() {
         window.addEventListener("message", (event) => {
             if (
@@ -65,6 +66,9 @@
         });
     }
 
+    // Attach a MutationObserver to detect changes in the DOM and trigger scans for solve detection.
+    // This is because LeetCode's React-based frontend may update the page with results after the initial load, and we want to
+    // catch those updates as soon as possible.
     function attachObserver() {
         console.log("[LeetCode Tracker] Attaching DOM observer.");
         if (observer) {
@@ -96,7 +100,7 @@
     }
 
     async function inspectPage() {
-        console.log("[LeetCode Tracker] Inspecting page at:", location.pathname);
+        //console.log("[LeetCode Tracker] Inspecting page at:", location.pathname);
         const solve = extractSolveCandidate();
 
         if (!solve) {
@@ -110,8 +114,8 @@
         }
 
         lastSentFingerprint = solve.fingerprint;
-        console.log("[LeetCode Tracker] Sending SOLVE_DETECTED for:", solve.problemSlug, "Fingerprint:", solve.fingerprint);
-
+        console.log("[LeetCode Tracker] Sending SOLVE_DETECTED for:", solve.problemSlug, solve.difficulty, "Fingerprint:", solve.fingerprint);
+        
         try {
             await chrome.runtime.sendMessage({
                 type: "SOLVE_DETECTED",
@@ -124,7 +128,7 @@
     }
 
     function extractSolveCandidate() {
-        console.log("[LeetCode Tracker] Extracting solve candidate...");
+        //console.log("[LeetCode Tracker] Extracting solve candidate...");
         
         if (!location.pathname.startsWith("/problems/")) {
             console.debug("[LeetCode Tracker] Not on a problem page:", location.pathname);
@@ -134,7 +138,7 @@
         const resultNode = document.querySelector(SELECTORS.submissionResult);
         const domResultText = normalizeWhitespace(resultNode?.textContent || "");
         const resultText = domResultText || (lastApiResult?.status ?? "");
-        console.log("[LeetCode Tracker] Result node found:", !!resultNode, "DOM text:", domResultText, "API status:", lastApiResult?.status ?? "none");
+        //console.log("[LeetCode Tracker] Result node found:", !!resultNode, "DOM text:", domResultText, "API status:", lastApiResult?.status ?? "none");
         
         if (!resultNode) {
             console.warn("[LeetCode Tracker] Selector not found:", SELECTORS.submissionResult);
@@ -163,7 +167,7 @@
             console.warn("[LeetCode Tracker] Could not parse problem route.");
             return null;
         }
-        console.log("[LeetCode Tracker] Parsed route info:", routeInfo);
+        //console.log("[LeetCode Tracker] Parsed route info:", routeInfo);
 
         const descriptionInfo = extractDescriptionDivInfo();
         const titleInfo = parseProblemTitle(routeInfo.problemSlug);
@@ -288,6 +292,7 @@
         // Try targeted selectors first for speed
         for (const selector of SELECTORS.difficultyBadges) {
             const node = document.querySelector(selector);
+            console.log("[LeetCode Tracker] Checking difficulty selector:", selector, "Found node:", !!node);
             if (node && isVisible(node)) {
                 const text = normalizeWhitespace(node.textContent || "");
                 if (["Easy", "Medium", "Hard"].includes(text)) {
