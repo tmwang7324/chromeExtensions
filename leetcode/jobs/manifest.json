@@ -1,0 +1,53 @@
+{
+    "name": "Job Application Tracker",
+    "description": "Detects job application submissions on LinkedIn, Handshake, Workday, and Google Careers, and logs them to a Google Sheet via Apps Script.",
+    "version": "1.0.0",
+    "manifest_version": 3,
+    "action": {
+        "default_title": "Job Application Tracker",
+        "default_popup": "popup.html"
+    },
+    "background": {
+        "service_worker": "background.js"
+    },
+    "permissions": [
+        "storage",
+        "scripting",
+        "tabs",
+        "activeTab"
+    ],
+    "host_permissions": [
+        "https://www.linkedin.com/*",
+        "https://*.joinhandshake.com/*",
+        "https://*.myworkdayjobs.com/*",
+        "https://careers.google.com/*",
+        "https://www.google.com/about/careers/*",
+        "https://script.google.com/*",
+        "https://script.googleusercontent.com/*"
+    ],
+    "content_scripts": [
+        {
+            "matches": [
+                "https://www.linkedin.com/jobs/*",
+                "https://*.joinhandshake.com/*",
+                "https://*.myworkdayjobs.com/*",
+                "https://careers.google.com/*",
+                "https://www.google.com/about/careers/*"
+            ],
+            "js": ["inject.js"],
+            "run_at": "document_start",
+            "world": "MAIN"
+        },
+        {
+            "matches": [
+                "https://www.linkedin.com/jobs/*",
+                "https://*.joinhandshake.com/*",
+                "https://*.myworkdayjobs.com/*",
+                "https://careers.google.com/*",
+                "https://www.google.com/about/careers/*"
+            ],
+            "js": ["content.js"],
+            "run_at": "document_idle"
+        }
+    ]
+}

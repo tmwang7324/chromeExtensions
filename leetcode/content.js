@@ -269,13 +269,22 @@
     }
 
     function parseProblemTitle(problemSlug) {
-        const links = Array.from(document.querySelectorAll(SELECTORS.titleLink));
-        const matchingLink = links.find((link) => {
-            const href = link.getAttribute("href") || "";
-            return href.startsWith(`/problems/${problemSlug}`);
-        }) || links[0];
+        const exactHref = `/problems/${problemSlug}/`;
+        const alternateHref = `/problems/${problemSlug}`;
+        const matchingLink = document.querySelector(
+            `a[href="${exactHref}"], a[href="${alternateHref}"]`
+        );
 
-        const titleText = normalizeWhitespace(matchingLink?.textContent || "");
+        const fallbackLinks = matchingLink
+            ? [matchingLink]
+            : Array.from(document.querySelectorAll(SELECTORS.titleLink));
+
+        const titleSource = matchingLink || fallbackLinks.find((link) => {
+            const href = link.getAttribute("href") || "";
+            return href.startsWith(alternateHref);
+        }) || fallbackLinks[0];
+
+        const titleText = normalizeWhitespace(titleSource?.textContent || "");
         const match = titleText.match(/^(\d+)\.\s+(.+)$/);
 
         if (!match) {
